@@ -1,6 +1,10 @@
 # 应用图标提取器 (App Icon Extractor)
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-3.5.0-blue?style=for-the-badge)
+![Platform](https://img.shields.io/badge/Platform-Android-green?style=for-the-badge&logo=android)
 
-一款 Android 应用，可提取手机内所有已安装应用的图标并保存到本地。
+一款强大的 Android 应用图标提取工具，支持批量提取、智能搜索与分类筛选。
 
 ## 功能特点
 
@@ -10,34 +14,6 @@
 - 🎨 **高清图标** - 支持自适应图标`Adaptive Icon`，保持原始分辨率
 - 📊 **实时进度** - 显示提取进度和状态
 
-## 项目结构
-
-```
-AppIconExtractor/
-├── app/
-│   ├── src/main/
-│   │   ├── java/com/appiconextractor/
-│   │   │   └── MainActivity.kt          # 主Activity
-│   │   ├── res/
-│   │   │   ├── layout/
-│   │   │   │   ├── activity_main.xml    # 主界面布局
-│   │   │   │   └── item_app.xml         # 列表项布局
-│   │   │   ├── values/
-│   │   │   │   ├── strings.xml          # 字符串资源
-│   │   │   │   ├── colors.xml           # 颜色资源
-│   │   │   │   └── themes.xml           # 主题样式
-│   │   │   ├── xml/
-│   │   │   │   └── file_paths.xml       # FileProvider配置
-│   │   │   └── mipmap-*/                # 应用图标(可自行添加)
-│   │   └── AndroidManifest.xml          # 清单文件
-│   ├── build.gradle                     # 应用级构建配置
-│   └── proguard-rules.pro               # 混淆规则
-├── gradle/wrapper/
-│   └── gradle-wrapper.properties        # Gradle版本配置
-├── build.gradle                         # 项目级构建配置
-├── settings.gradle                      # 项目设置
-└── gradle.properties                    # Gradle属性
-```
 
 ## 编译方法
 
@@ -72,7 +48,7 @@ gradle assembleDebug
 ```
 
 ## 安装与使用
-
+https://github.com/0liuuil0/AppIconExtractor/releases/tag/v3.5.0
 1. 将 APK 安装到手机：
    ```bash
    adb install app-debug.apk
