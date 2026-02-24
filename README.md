@@ -48,7 +48,8 @@ gradle assembleDebug
 ```
 
 ## 安装与使用
-https://github.com/0liuuil0/AppIconExtractor/releases/tag/v3.5.0
+
+
 1. 将 APK 安装到手机：
    ```bash
    adb install app-debug.apk
@@ -59,6 +60,12 @@ https://github.com/0liuuil0/AppIconExtractor/releases/tag/v3.5.0
 3. 点击 **"一键提取全部图标"** 按钮
 
 4. 图标保存路径：`/sdcard/Pictures/AppIcons_时间戳/`
+
+## ⬇️ 下载
+
+| 版本 | 下载 |
+|------|------|
+| 最新版 | [![](https://img.shields.io/badge/Download-v3.5.0-green?style=for-the-badge&logo=github)](https://github.com/0liuuil0/AppIconExtractor/releases/tag/v3.5.0) 
 
 ## 权限说明
 
