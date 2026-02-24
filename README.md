@@ -101,6 +101,4 @@ res/
 - Kotlin Coroutines
 - ViewBinding
 
-## License
-
-MIT License
+**此README使用AI生成+人工修改**
