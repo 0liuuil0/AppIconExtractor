@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">图标提取器</string>
+    <string name="loading_apps">正在加载应用列表...</string>
+    <string name="extracting">正在提取图标...</string>
+    <string name="extract_success">成功提取 %1$d 个图标</string>
+    <string name="extract_failed">提取失败: %1$s</string>
+    <string name="no_apps">未找到任何应用</string>
+    <string name="permission_required">需要存储权限才能保存图标</string>
+    <string name="saved_to">图标已保存到: %1$s</string>
+    <string name="app_count">已加载 %1$d 个应用</string>
+    <string name="icon_size">图标大小: %1$dx%1$d</string>
+    <string name="user_app">用户应用</string>
+    <string name="system_app">系统应用</string>
+    <string name="selected_count">已选择 %1$d 个应用</string>
+    <string name="search_hint">搜索应用名称或包名</string>
+    <string name="no_selection">请先选择要提取的应用</string>
+    <string name="enter_selection_mode">进入选择模式</string>
+    <string name="exit_selection_mode">退出选择模式</string>
+</resources>

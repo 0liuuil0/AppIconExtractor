@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Blue background circle -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M24,24m22,0a22,22 0,1 1,0 -44a22,22 0,1 1,0 44"/>
+
+    <!-- White grid representing app icons -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,12h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,12h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,12h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,20h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,20h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,20h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,28h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,28h8v8h-8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,28h8v8h-8z"/>
+
+</vector>
