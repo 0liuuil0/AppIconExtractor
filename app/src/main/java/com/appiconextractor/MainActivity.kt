@@ -1,5 +1,6 @@
 package com.appiconextractor
 
+import android.Manifest
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -25,6 +26,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -52,24 +55,29 @@ class MainActivity : AppCompatActivity() {
     private val allAppList = mutableListOf<AppInfo>()
     private val filteredAppList = mutableListOf<AppInfo>()
     private val selectedApps = mutableSetOf<String>()
-    
+
     // 图标保存目录
     private lateinit var saveDir: File
-    
+
     // 当前筛选模式
     private var currentFilter = FilterMode.ALL
-    
+
     // 是否处于选择模式
     private var isSelectionMode = false
 
     // 搜索关键词
     private var searchQuery = ""
 
+    // ---------- 权限相关 ----------
+    private val PERMISSION_REQUEST_CODE = 100
+    private var pendingExtractList: List<AppInfo>? = null   // 待提取的应用列表（批量）
+    private var pendingSingleApp: AppInfo? = null           // 待提取的单个应用
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        
+
         initSaveDir()
         initRecyclerView()
         setupSearch()
@@ -77,6 +85,117 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         loadAppList()
     }
+
+    override fun onResume() {
+        super.onResume()
+        // 如果用户从设置页面返回，检查权限是否已授予，并继续执行挂起的任务
+        checkPendingExtraction()
+    }
+
+    /**
+     * 检查是否有存储权限
+     */
+    private fun hasStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    /**
+     * 请求存储权限（根据系统版本选择不同方式）
+     */
+    private fun requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ 引导用户开启“所有文件访问权限”
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
+            } catch (e: Exception) {
+                // 降级方案
+                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                startActivity(intent)
+            }
+        } else {
+            // Android 10 及以下动态请求 WRITE_EXTERNAL_STORAGE
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                PERMISSION_REQUEST_CODE
+            )
+        }
+    }
+
+    /**
+     * 权限请求回调（仅对低版本有效）
+     */
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // 权限已授予，执行挂起的任务
+                checkPendingExtraction()
+            } else {
+                Toast.makeText(this, "存储权限被拒绝，无法保存图标", Toast.LENGTH_SHORT).show()
+                // 清空挂起任务
+                pendingExtractList = null
+                pendingSingleApp = null
+            }
+        }
+    }
+
+    /**
+     * 检查并执行挂起的提取任务（在权限授予后调用）
+     */
+    private fun checkPendingExtraction() {
+        if (hasStoragePermission()) {
+            pendingExtractList?.let {
+                extractIcons(it)
+                pendingExtractList = null
+            }
+            pendingSingleApp?.let {
+                extractSingleIcon(it)
+                pendingSingleApp = null
+            }
+        }
+    }
+
+    /**
+     * 启动批量提取（会先检查权限）
+     */
+    private fun startExtraction(apps: List<AppInfo>) {
+        if (hasStoragePermission()) {
+            extractIcons(apps)
+        } else {
+            pendingExtractList = apps
+            requestStoragePermission()
+            Toast.makeText(this, "请授予存储权限后再次点击提取", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * 启动单个提取（会先检查权限）
+     */
+    private fun startSingleExtraction(appInfo: AppInfo) {
+        if (hasStoragePermission()) {
+            extractSingleIcon(appInfo)
+        } else {
+            pendingSingleApp = appInfo
+            requestStoragePermission()
+            Toast.makeText(this, "请授予存储权限后再次点击提取", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ---------- 原有代码（未修改部分） ----------
 
     /**
      * 初始化保存目录
@@ -101,7 +220,7 @@ class MainActivity : AppCompatActivity() {
                 if (isSelectionMode) {
                     toggleSelection(appInfo)
                 } else {
-                    extractSingleIcon(appInfo)
+                    startSingleExtraction(appInfo)  // 改为调用带权限检查的方法
                 }
             },
             onItemLongClick = { appInfo ->
@@ -111,7 +230,7 @@ class MainActivity : AppCompatActivity() {
                 true
             },
             onDownloadClick = { appInfo ->
-                extractSingleIcon(appInfo)
+                startSingleExtraction(appInfo)      // 改为调用带权限检查的方法
             }
         )
         binding.rvAppList.apply {
@@ -183,27 +302,27 @@ class MainActivity : AppCompatActivity() {
      */
     private fun applyFilter() {
         filteredAppList.clear()
-        
+
         val filtered = when (currentFilter) {
             FilterMode.ALL -> allAppList.toList()
             FilterMode.USER -> allAppList.filter { !it.isSystemApp }
             FilterMode.SYSTEM -> allAppList.filter { it.isSystemApp }
             FilterMode.SELECTED -> allAppList.filter { selectedApps.contains(it.packageName) }
         }
-        
+
         // 应用搜索
         val searchFiltered = if (searchQuery.isNotEmpty()) {
             filtered.filter {
                 it.appName.contains(searchQuery, ignoreCase = true) ||
-                it.packageName.contains(searchQuery, ignoreCase = true)
+                        it.packageName.contains(searchQuery, ignoreCase = true)
             }
         } else {
             filtered
         }
-        
+
         filteredAppList.addAll(searchFiltered)
         appListAdapter.notifyDataSetChanged()
-        
+
         updateAppCountText()
     }
 
@@ -272,11 +391,11 @@ class MainActivity : AppCompatActivity() {
     private fun enterSelectionMode(appInfo: AppInfo) {
         isSelectionMode = true
         selectedApps.add(appInfo.packageName)
-        
+
         binding.selectionToolbar.visibility = View.VISIBLE
         binding.btnExtractAll.visibility = View.GONE
         binding.btnExtractSelected.visibility = View.VISIBLE
-        
+
         appListAdapter.notifyDataSetChanged()
         updateSelectionToolbar()
     }
@@ -287,11 +406,11 @@ class MainActivity : AppCompatActivity() {
     private fun exitSelectionMode() {
         isSelectionMode = false
         selectedApps.clear()
-        
+
         binding.selectionToolbar.visibility = View.GONE
         binding.btnExtractAll.visibility = View.VISIBLE
         binding.btnExtractSelected.visibility = View.GONE
-        
+
         appListAdapter.notifyDataSetChanged()
     }
 
@@ -321,7 +440,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun updateSelectionToolbar() {
         binding.tvSelectedCount.text = getString(R.string.selected_count, selectedApps.size)
-        
+
         // 更新全选按钮文本
         if (selectedApps.size == filteredAppList.size && filteredAppList.isNotEmpty()) {
             binding.btnSelectAll.text = "取消全选"
@@ -342,21 +461,23 @@ class MainActivity : AppCompatActivity() {
             try {
                 val pm = packageManager
                 val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                
+
                 val tempList = mutableListOf<AppInfo>()
-                
+
                 for (appInfo in packages) {
                     try {
                         val appName = pm.getApplicationLabel(appInfo).toString()
                         val packageName = appInfo.packageName
                         val icon = pm.getApplicationIcon(appInfo)
-                        
-                        tempList.add(AppInfo(
-                            appName = appName,
-                            packageName = packageName,
-                            icon = icon,
-                            isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        ))
+
+                        tempList.add(
+                            AppInfo(
+                                appName = appName,
+                                packageName = packageName,
+                                icon = icon,
+                                isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                            )
+                        )
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -388,16 +509,10 @@ class MainActivity : AppCompatActivity() {
     private fun showExtractDialog(appsToExtract: List<AppInfo>) {
         val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
         val folderName = "AppIcons_${dateFormat.format(Date())}"
-        
-        AlertDialog.Builder(this)
-            .setTitle("提取图标")
-            .setMessage("将提取 ${appsToExtract.size} 个应用的图标\n保存到: Pictures/$folderName/")
-            .setPositiveButton("开始提取") { _, _ ->
-                createNewSaveFolder(folderName)
-                extractIcons(appsToExtract)
-            }
-            .setNegativeButton("取消", null)
-            .show()
+
+        // 直接创建文件夹并开始提取，无需用户确认
+        createNewSaveFolder(folderName)
+        startExtraction(appsToExtract)
     }
 
     /**
@@ -412,7 +527,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 提取应用图标
+     * 提取应用图标（批量）
      */
     private fun extractIcons(appsToExtract: List<AppInfo>) {
         binding.progressBar.visibility = View.VISIBLE
@@ -451,20 +566,20 @@ class MainActivity : AppCompatActivity() {
                 binding.progressBar.visibility = View.GONE
                 binding.btnExtractAll.isEnabled = true
                 binding.btnExtractSelected.isEnabled = true
-                
+
                 val message = if (failCount == 0) {
                     getString(R.string.extract_success, successCount)
                 } else {
                     "成功: $successCount, 失败: $failCount"
                 }
-                
+
                 binding.tvStatus.text = message
                 Toast.makeText(
                     this@MainActivity,
                     "$message\n保存路径: ${saveDir.absolutePath}",
                     Toast.LENGTH_LONG
                 ).show()
-                
+
                 // 如果在选择模式下，提取后退出选择模式
                 if (isSelectionMode) {
                     exitSelectionMode()
@@ -486,7 +601,7 @@ class MainActivity : AppCompatActivity() {
                     saveDir.mkdirs()
                 }
             }
-            
+
             val success = saveIcon(appInfo)
             withContext(Dispatchers.Main) {
                 if (success) {
@@ -513,12 +628,12 @@ class MainActivity : AppCompatActivity() {
         return try {
             val icon = appInfo.icon
             val bitmap = drawableToBitmap(icon)
-            
+
             if (bitmap != null) {
                 val safeFileName = appInfo.packageName.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
                 val fileName = "${safeFileName}.png"
                 val file = File(saveDir, fileName)
-                
+
                 FileOutputStream(file).use { fos ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
                 }
@@ -542,7 +657,7 @@ class MainActivity : AppCompatActivity() {
                 is AdaptiveIconDrawable -> {
                     val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 216
                     val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 216
-                    
+
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     val canvas = Canvas(bitmap)
                     drawable.setBounds(0, 0, canvas.width, canvas.height)
@@ -552,7 +667,7 @@ class MainActivity : AppCompatActivity() {
                 else -> {
                     val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
                     val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
-                    
+
                     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                     val canvas = Canvas(bitmap)
                     drawable.setBounds(0, 0, canvas.width, canvas.height)
@@ -581,11 +696,11 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Uri.fromFile(saveDir)
             }
-            
+
             intent.setDataAndType(uri, "resource/folder")
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            
+
             val chooser = Intent.createChooser(intent, "选择文件管理器")
             startActivity(chooser)
         } catch (e: Exception) {
@@ -640,7 +755,7 @@ class AppListAdapter(
         val tvPackageName: TextView = view.findViewById(R.id.tvPackageName)
         val tvAppType: TextView = view.findViewById(R.id.tvAppType)
         val btnDownload: ImageButton = view.findViewById(R.id.btnDownload)
-        
+
         // 存储当前绑定的应用包名，用于判断checkbox点击
         var currentPackageName: String? = null
     }
@@ -654,14 +769,14 @@ class AppListAdapter(
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
         val appInfo = appList[position]
         val context = holder.itemView.context
-        
+
         // 保存当前包名
         holder.currentPackageName = appInfo.packageName
-        
+
         holder.ivAppIcon.setImageDrawable(appInfo.icon)
         holder.tvAppName.text = appInfo.appName
         holder.tvPackageName.text = appInfo.packageName
-        
+
         // 设置应用类型标签
         if (appInfo.isSystemApp) {
             holder.tvAppType.text = "系统应用"
@@ -670,16 +785,16 @@ class AppListAdapter(
             holder.tvAppType.text = "用户应用"
             holder.tvAppType.setBackgroundResource(R.drawable.tag_background)
         }
-        
+
         // 选择模式
         val inSelectionMode = isSelectionMode()
         holder.checkbox.visibility = if (inSelectionMode) View.VISIBLE else View.GONE
         holder.btnDownload.visibility = if (inSelectionMode) View.GONE else View.VISIBLE
-        
+
         // 先移除监听器，再设置状态，避免触发回调
         holder.checkbox.setOnCheckedChangeListener(null)
         holder.checkbox.isChecked = selectedApps.contains(appInfo.packageName)
-        
+
         // 设置checkbox点击监听
         holder.checkbox.setOnCheckedChangeListener { _, isChecked ->
             // 确保是当前项的操作
@@ -688,16 +803,16 @@ class AppListAdapter(
                 onItemClick(appInfo)
             }
         }
-        
+
         // 点击事件 - 使用点击位置判断
         holder.itemView.setOnClickListener {
             onItemClick(appInfo)
         }
-        
+
         holder.itemView.setOnLongClickListener {
             onItemLongClick(appInfo)
         }
-        
+
         holder.btnDownload.setOnClickListener {
             onDownloadClick(appInfo)
         }
